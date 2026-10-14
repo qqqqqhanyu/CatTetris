@@ -20,6 +20,12 @@ button { touch-action: manipulation; }
   .brand > div > span { font-size: 6px; letter-spacing: 1px; margin-top: 3px; }
   .icon-button { min-width: 44px; min-height: 44px; padding: 7px; }
   .icon-button span, .local-badge { display: none; }
+  .top-actions { gap: 3px; }
+  .skin-picker { padding: 1px; gap: 0; border-radius: 9px; }
+  .skin-label { display: none; }
+  .skin-picker button { min-height: 42px; min-width: 48px; padding: 6px 7px; gap: 4px; font-size: 11px; }
+  .skin-dot { width: 5px; height: 5px; }
+  #skin-status { bottom: -12px; font-size: 8px; }
   .play-layout { grid-template-columns: auto 84px; gap: 10px 12px; margin-top: 10px; justify-content: center; }
   .left-column { grid-column: 1 / -1; display: flex; gap: 9px; padding: 0; align-items: center; }
   .intro, .gentle-note, .level-track { display: none; }
@@ -73,6 +79,11 @@ button { touch-action: manipulation; }
   #toast { font-size: 17px; letter-spacing: 1px; }
   dialog { padding: 22px; }
   dialog button { min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .brand > div > span { display: none; }
+  .brand b { font-size: 15px; }
+  .skin-picker button { padding-inline: 6px; }
 }
 @media (max-width: 600px) and (max-height: 680px) {
   .next-list > div:last-child { display: none; }

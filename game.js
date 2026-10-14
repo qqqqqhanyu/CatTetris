@@ -1,50 +1,56 @@
 /* Offline UI. All game rules live in engine.js and are independently testable. */
 (() => {
   'use strict';
-  const {Game,MATRICES,cells,HIDDEN}=CatrisEngine;
+  const {Game,cells,HIDDEN}=CatrisEngine;
+  const {SKINS,SPAWN_ROTATIONS,BLEED,buildTextures,drawTileArt,bounds}=CatrisSkins;
   const $=id=>document.getElementById(id),game=new Game();
   const canvas=$('board'),ctx=canvas.getContext('2d'),CELL=40;
   const colors={I:'#a1cbd9',O:'#dfc997',T:'#c5b3d7',S:'#acccb6',Z:'#d9aca9',J:'#a8bdd8',L:'#ddc0a0'};
-  const art={
-    I:{crop:[22,116,585,225],rotation:0},O:{crop:[637,76,312,272],rotation:0},
-    T:{crop:[1016,44,471,313],rotation:2},S:{crop:[29,491,389,360],rotation:0},
-    Z:{crop:[428,502,388,349],rotation:0},J:{crop:[827,440,326,439],rotation:3},
-    L:{crop:[1164,449,346,430],rotation:1}
-  };
-  const textures={},keys=new Map(),touchButtons=[...document.querySelectorAll('[data-action]')]; let loaded=false,lastTime=0,toastTimer=0,flash=null,sound=false,audioContext;
+  const keys=new Map(),touchButtons=[...document.querySelectorAll('[data-action]')];
+  const skinButtons=[...document.querySelectorAll('[data-skin]')],skinCache=new Map();
+  let textures=null,activeSkin='jianguo',pendingSkin=null,skinRequest=0,skinError='';
+  let loaded=false,lastTime=0,toastTimer=0,flash=null,sound=false,audioContext;
   const touchScreen=matchMedia('(pointer: coarse)');
   let best=0,restartWasPlaying=false;
-  try{best=Number(localStorage.getItem('catris-best-v1'))||0;sound=localStorage.getItem('catris-sound-v1')==='true';}catch{}
+  try{best=Number(localStorage.getItem('catris-best-v1'))||0;sound=localStorage.getItem('catris-sound-v1')==='true';const saved=localStorage.getItem('catris-skin-v1');if(Object.hasOwn(SKINS,saved))activeSkin=saved;}catch{}
   function saveBest(){
     if(game.score>best){best=game.score;try{localStorage.setItem('catris-best-v1',String(best));}catch{}}
   }
-  function makeTextures(img){
-    const unit=160;
-    for(const [type,spec] of Object.entries(art)){
-      const matrix=MATRICES[type][spec.rotation],n=matrix.length;
-      const coords=cells({type,rotation:spec.rotation,x:0,y:0});
-      const minX=Math.min(...coords.map(c=>c.x)),maxX=Math.max(...coords.map(c=>c.x));
-      const minY=Math.min(...coords.map(c=>c.y)),maxY=Math.max(...coords.map(c=>c.y));
-      const original=document.createElement('canvas'); original.width=original.height=n*unit;
-      const painter=original.getContext('2d');
-      if(type==='J'||type==='L'){
-        // The drawing's head is wider than its stem. Map the upper body into
-        // the occupied stem, then keep the full-width tail in the bottom row.
-        // This preserves the whole face instead of clipping half of it away.
-        const upper=type==='J'?[913,440,240,300]:[1164,449,240,300];
-        const lower=type==='J'?[827,740,326,139]:[1164,749,346,130];
-        painter.drawImage(img,...upper,unit,0,unit,unit*2);
-        painter.drawImage(img,...lower,minX*unit,unit*2,unit*2,unit);
-      }else painter.drawImage(img,...spec.crop,minX*unit,minY*unit,(maxX-minX+1)*unit,(maxY-minY+1)*unit);
-      textures[type]=[];
-      for(let r=0;r<4;r++){
-        const c=document.createElement('canvas');c.width=c.height=n*unit;
-        const p=c.getContext('2d');p.translate(c.width/2,c.height/2);p.rotate((r-spec.rotation)*Math.PI/2);
-        p.drawImage(original,-c.width/2,-c.height/2);textures[type].push(c);
-      }
+  function skinUI(){
+    skinButtons.forEach(button=>{
+      button.setAttribute('aria-pressed',String(button.dataset.skin===activeSkin));
+      button.setAttribute('aria-busy',String(button.dataset.skin===pendingSkin));
+      button.classList.toggle('loading',button.dataset.skin===pendingSkin);
+    });
+    $('skin-status').textContent=pendingSkin?`${SKINS[pendingSkin].name}准备中…`:skinError;
+  }
+  function loadSkin(id){
+    if(!skinCache.has(id)){
+      const promise=new Promise((resolve,reject)=>{
+        const image=new Image();
+        image.onload=()=>{try{resolve(buildTextures(image));}catch(error){reject(error);}};
+        image.onerror=()=>reject(new Error('Skin image unavailable'));
+        image.src=SKINS[id].src;
+      }).catch(error=>{skinCache.delete(id);throw error;});
+      skinCache.set(id,promise);
+    }
+    return skinCache.get(id);
+  }
+  async function selectSkin(id){
+    if(!Object.hasOwn(SKINS,id))return;
+    const request=++skinRequest;pendingSkin=id;skinError='';skinUI();
+    try{
+      const next=await loadSkin(id);
+      if(request!==skinRequest)return;
+      textures=next;activeSkin=id;loaded=true;pendingSkin=null;
+      try{localStorage.setItem('catris-skin-v1',id);}catch{}
+      $('start').disabled=false;preview($('welcome-cat'),'O');skinUI();updateUI();
+    }catch{
+      if(request!==skinRequest)return;
+      pendingSkin=null;skinError=`${SKINS[id].name}加载失败，点名字重试`;skinUI();
+      if(!loaded){$('start').textContent='素材加载失败';$('overlay-description').textContent='请切换皮肤或刷新重试。';}
     }
   }
-  function bounds(piece){const c=cells(piece);return {minX:Math.min(...c.map(p=>p.x)),maxX:Math.max(...c.map(p=>p.x)),minY:Math.min(...c.map(p=>p.y)),maxY:Math.max(...c.map(p=>p.y))};}
   function drawPiece(context,piece,size,ox=0,oy=0,ghost=false){
     const occupied=cells(piece),set=new Set(occupied.map(c=>`${c.x},${c.y}`));
     for(const c of occupied){
@@ -53,13 +59,12 @@
         context.fillStyle=colors[piece.type]+'24';context.fillRect(x+1,y+1,size-2,size-2);
         context.strokeStyle=colors[piece.type]+'b0';context.lineWidth=1.2;
         context.setLineDash([3,3]);context.strokeRect(x+2,y+2,size-4,size-4);context.setLineDash([]);
-      }else drawTile(context,{...c,...piece,tx:c.tx,ty:c.ty},x,y,size,(dx,dy)=>set.has(`${c.x+dx},${c.y+dy}`));
+      }else drawTileBase(context,piece,x,y,size,(dx,dy)=>set.has(`${c.x+dx},${c.y+dy}`));
     }
+    if(!ghost)for(const c of occupied)drawTileArt(context,textures,{...piece,tx:c.tx,ty:c.ty},ox+c.x*size,oy+c.y*size,size);
   }
-  function drawTile(context,tile,x,y,size,neighbor){
+  function drawTileBase(context,tile,x,y,size,neighbor){
     context.fillStyle=colors[tile.type]+'57';context.fillRect(x,y,size,size);
-    const texture=textures[tile.type]?.[tile.rotation];
-    if(texture)context.drawImage(texture,tile.tx*160,tile.ty*160,160,160,x,y,size,size);
     context.strokeStyle=colors[tile.type];context.lineWidth=1.35;
     context.beginPath();
     if(!neighbor(0,-1)){context.moveTo(x+.7,y+.7);context.lineTo(x+size-.7,y+.7);}
@@ -74,8 +79,8 @@
       if(empty){c.strokeStyle='#dce5e5';c.lineWidth=2;c.setLineDash([5,5]);c.strokeRect(88,40,64,60);c.setLineDash([]);c.fillStyle='#b4c2c5';c.font='24px -apple-system';c.textAlign='center';c.fillText('+',120,78);}return;
     }
     // Previews show the supplied upright cat poses; gameplay uses spawn orientation.
-    const piece={type,rotation:art[type].rotation,x:0,y:0};const b=bounds(piece);
-    const size=Math.min(48,(element.width-24)/(b.maxX-b.minX+1),(element.height-24)/(b.maxY-b.minY+1));
+    const piece={type,rotation:SPAWN_ROTATIONS[type],x:0,y:0};const b=bounds(type,piece.rotation);
+    const size=Math.min(48,(element.width-12)/(b.maxX-b.minX+1+2*BLEED),(element.height-12)/(b.maxY-b.minY+1+2*BLEED));
     const ox=(element.width-(b.maxX-b.minX+1)*size)/2-b.minX*size,oy=(element.height-(b.maxY-b.minY+1)*size)/2-b.minY*size;
     drawPiece(c,piece,size,ox,oy);
   }
@@ -87,10 +92,13 @@
     ctx.strokeStyle='#e6eef0';ctx.lineWidth=.6;ctx.beginPath();
     for(let x=0;x<=400;x+=CELL){ctx.moveTo(x,0);ctx.lineTo(x,800);}
     for(let y=0;y<=800;y+=CELL){ctx.moveTo(0,y);ctx.lineTo(400,y);}ctx.stroke();
+    const settled=[];
     for(let y=0;y<20;y++)for(let x=0;x<10;x++){
       const tile=game.board[y+HIDDEN][x];if(!tile)continue;
-      drawTile(ctx,tile,x*CELL,y*CELL,CELL,(dx,dy)=>game.board[y+HIDDEN+dy]?.[x+dx]?.id===tile.id);
+      drawTileBase(ctx,tile,x*CELL,y*CELL,CELL,(dx,dy)=>game.board[y+HIDDEN+dy]?.[x+dx]?.id===tile.id);
+      settled.push({tile,x,y});
     }
+    for(const {tile,x,y} of settled)drawTileArt(ctx,textures,tile,x*CELL,y*CELL,CELL);
     if(game.active&&game.status!=='over'){
       ctx.save();ctx.beginPath();ctx.rect(0,0,400,800);ctx.clip();
       drawPiece(ctx,game.ghost(),CELL,0,0,true);drawPiece(ctx,game.active,CELL);ctx.restore();
@@ -114,12 +122,12 @@
   }}
   let previousSignature='',previousUI='';
   function updateUI(){
-    const state=[game.status,game.score,game.lines,game.level,game.held,game.holdUsed,...game.queue.slice(0,3),loaded].join('|');
+    const state=[game.status,game.score,game.lines,game.level,game.held,game.holdUsed,...game.queue.slice(0,3),loaded,activeSkin].join('|');
     if(state===previousUI)return;previousUI=state;
     saveBest();$('score').textContent=String(game.score).padStart(6,'0');$('best').textContent=best.toLocaleString('zh-CN');
     $('level').textContent=String(game.level).padStart(2,'0');$('lines').textContent=String(game.lines).padStart(2,'0');
     $('remaining').textContent=`${10-game.lines%10} 行`;$('progress').style.width=game.lines%10*10+'%';
-    const signature=[...game.queue.slice(0,3),game.held,game.holdUsed,loaded].join('|');
+    const signature=[...game.queue.slice(0,3),game.held,game.holdUsed,loaded,activeSkin].join('|');
     if(signature!==previousSignature){game.queue.slice(0,3).forEach((type,i)=>preview($('next-'+i),type));preview($('held'),game.held,true);previousSignature=signature;}
     $('hold').classList.toggle('used',game.holdUsed);$('hold').disabled=game.status!=='playing'||game.holdUsed;
     $('hold-hint').textContent=game.holdUsed?'落下后可再次暂存':'留给更合适的时候';
@@ -130,7 +138,7 @@
     $('overlay').hidden=game.status==='playing';
     if(game.status!=='playing'){
       const paused=game.status==='paused',over=game.status==='over';
-      $('overlay-title').textContent=paused?'小猫打个盹':over?'今天也很棒':'小猫已就位';
+      $('overlay-title').textContent=paused?'小猫打个盹':over?'今天也很棒':`${SKINS[activeSkin].name}已就位`;
       $('overlay-kicker').textContent=paused?'TAKE YOUR TIME':over?'ONE MORE COZY ROUND?':'A COZY LITTLE BREAK';
       $('overlay-description').textContent=paused?'不着急，我们在这里等你。':over?`本局 ${game.score.toLocaleString()} 分 · 消除 ${game.lines} 行`:'拼好一整行，腾出更多温柔。';
       if(loaded)$('start').textContent=paused?'继续游戏':over?'再玩一局':'开始游戏';
@@ -149,7 +157,7 @@
   }
   const mapping={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'soft',ArrowUp:'rotate',KeyX:'rotate',KeyZ:'reverse',Space:'drop',KeyC:'hold',ShiftLeft:'hold',ShiftRight:'hold'};
   document.addEventListener('keydown',e=>{
-    if(e.metaKey||e.ctrlKey||e.altKey||$('restart-dialog').open)return;
+    if(e.metaKey||e.ctrlKey||e.altKey||$('restart-dialog').open||e.target.closest('.skin-picker'))return;
     if(['KeyP','Escape','Enter'].includes(e.code)){
       if(e.target.closest('button')&&e.code==='Enter')return;
       e.preventDefault();if(e.repeat)return;
@@ -197,7 +205,6 @@
     }
     updateUI();draw(time);requestAnimationFrame(frame);
   }
-  const img=new Image();img.onload=()=>{makeTextures(img);loaded=true;preview($('welcome-cat'),'O');$('start').disabled=false;updateUI();};
-  img.onerror=()=>{$('start').textContent='素材加载失败';$('overlay-description').textContent='请检查网络后刷新页面。';};
-  img.src='assets/cats.png';soundUI();requestAnimationFrame(frame);
+  skinButtons.forEach(button=>button.addEventListener('click',()=>{selectSkin(button.dataset.skin);button.blur();}));
+  soundUI();selectSkin(activeSkin);requestAnimationFrame(frame);
 })();

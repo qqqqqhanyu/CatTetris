@@ -7,3 +7,6 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 .brand .cat-mark{width:39px;height:39px;flex-shrink:0;border:0;background:none;overflow:visible}
+
+.topbar{position:relative}.top-actions{gap:16px}.skin-picker{display:flex;align-items:center;gap:3px;padding:3px;border:1px solid #dde5e5;border-radius:11px;background:#eef2f0}.skin-label{font-size:10px;color:#8a9b9f;margin:0 7px;letter-spacing:1px}.skin-picker button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border:1px solid transparent;border-radius:8px;background:transparent;font-size:12px;color:#839497;white-space:nowrap}.skin-picker button[aria-pressed="true"]{border-color:#d9e3e5;background:#fffefb;color:#425f6f;box-shadow:0 1px 4px #385c6d0a}.skin-picker button.loading{opacity:.55}.skin-dot{display:block;width:7px;height:7px;border-radius:50%;flex-shrink:0}.skin-dot.jianguo{background:#7babc7}.skin-dot.yuanxiao{background:#8fa782}#skin-status{position:absolute;right:0;bottom:-18px;font-size:10px;color:#7d9399;z-index:4;background:var(--paper)}
+@media(max-width:1050px){.top-actions{gap:8px}.local-badge{display:none}.skin-label{display:none}}
