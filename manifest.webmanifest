@@ -1,0 +1,13 @@
+{
+  "id": "./",
+  "name": "猫咪方块 · CATRIS",
+  "short_name": "猫咪方块",
+  "description": "一整行可爱。手机和电脑都能玩的猫咪俄罗斯方块。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f6f2",
+  "theme_color": "#f7f6f2",
+  "icons": [{"src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}
