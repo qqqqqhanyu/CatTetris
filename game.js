@@ -3,13 +3,14 @@
   'use strict';
   const {Game,cells,HIDDEN}=CatrisEngine;
   const {SKINS,SPAWN_ROTATIONS,BLEED,buildTextures,drawTileArt,bounds}=CatrisSkins;
+  const audio=new CatrisAudio.SoundPlayer();
   const $=id=>document.getElementById(id),game=new Game();
   const canvas=$('board'),ctx=canvas.getContext('2d'),CELL=40;
   const colors={I:'#a1cbd9',O:'#dfc997',T:'#c5b3d7',S:'#acccb6',Z:'#d9aca9',J:'#a8bdd8',L:'#ddc0a0'};
   const keys=new Map(),touchButtons=[...document.querySelectorAll('[data-action]')];
   const skinButtons=[...document.querySelectorAll('[data-skin]')],skinCache=new Map();
   let textures=null,activeSkin='jianguo',pendingSkin=null,skinRequest=0,skinError='';
-  let loaded=false,lastTime=0,toastTimer=0,flash=null,sound=false,audioContext;
+  let loaded=false,lastTime=0,toastTimer=0,flash=null,sound=false;
   const touchScreen=matchMedia('(pointer: coarse)');
   let best=0,restartWasPlaying=false;
   try{best=Number(localStorage.getItem('catris-best-v1'))||0;sound=localStorage.getItem('catris-sound-v1')==='true';const saved=localStorage.getItem('catris-skin-v1');if(Object.hasOwn(SKINS,saved))activeSkin=saved;}catch{}
@@ -78,7 +79,7 @@
     if(!type){
       if(empty){c.strokeStyle='#dce5e5';c.lineWidth=2;c.setLineDash([5,5]);c.strokeRect(88,40,64,60);c.setLineDash([]);c.fillStyle='#b4c2c5';c.font='24px -apple-system';c.textAlign='center';c.fillText('+',120,78);}return;
     }
-    // Previews show the supplied upright cat poses; gameplay uses spawn orientation.
+    // Previews use the same supplied cat pose and spawn orientation as gameplay.
     const piece={type,rotation:SPAWN_ROTATIONS[type],x:0,y:0};const b=bounds(type,piece.rotation);
     const size=Math.min(48,(element.width-12)/(b.maxX-b.minX+1+2*BLEED),(element.height-12)/(b.maxY-b.minY+1+2*BLEED));
     const ox=(element.width-(b.maxX-b.minX+1)*size)/2-b.minX*size,oy=(element.height-(b.maxY-b.minY+1)*size)/2-b.minY*size;
@@ -105,20 +106,11 @@
     }
     if(flash){const opacity=Math.max(0,1-(time-flash.time)/320);if(!opacity)flash=null;else{ctx.fillStyle=`rgba(210,231,233,${opacity*.8})`;for(const y of flash.rows)ctx.fillRect(0,y*CELL,400,CELL);}}
   }
-  function playTone(kind){
-    if(!sound)return;
-    try{
-      audioContext??=new(window.AudioContext||window.webkitAudioContext)();audioContext.resume();
-      const notes=kind==='clear'?[523,659,784]:kind==='over'?[330,262,196]:kind==='rotate'?[660]:[180];
-      notes.forEach((hz,i)=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain(),t=audioContext.currentTime+i*.08;
-        osc.type='sine';osc.frequency.setValueAtTime(hz,t);gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(.045,t+.008);gain.gain.exponentialRampToValueAtTime(.001,t+.16);
-        osc.connect(gain);gain.connect(audioContext.destination);osc.start(t);osc.stop(t+.17);});
-    }catch{}
-  }
+  function playTone(kind){audio.play(kind);}
   function notify(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),1300);}
-  function events(){for(const e of game.drainEvents()){
+  function events(){const batch=game.drainEvents(),cleared=batch.some(e=>e.type==='clear');for(const e of batch){
     if(e.type==='clear'){flash={rows:e.rows,time:performance.now()};notify(e.perfect?'整整齐齐 · 全清！':e.spin?'T-SPIN！':e.count===4?'四行全消！':`${e.count} 行消除${e.combo>0?' · 连击 '+e.combo:''}`);playTone('clear');}
-    else if(e.type==='over')playTone('over');else if(['rotate','drop','hold'].includes(e.type))playTone(e.type);
+    else if(e.type==='over')playTone('over');else if(['rotate','drop','hold'].includes(e.type)&&!(cleared&&e.type==='drop'))playTone(e.type);
   }}
   let previousSignature='',previousUI='';
   function updateUI(){
@@ -171,7 +163,7 @@
     action(a);if(['left','right','soft'].includes(a))keys.set(e.code,{action:a,time:performance.now(),next:a==='soft'?35:150});
   });
   document.addEventListener('keyup',e=>keys.delete(e.code));
-  function autoPause(){keys.clear();if(game.status==='playing'){game.pause();updateUI();}}
+  function autoPause(){keys.clear();audio.stop();if(game.status==='playing'){game.pause();updateUI();}}
   window.addEventListener('blur',autoPause);document.addEventListener('visibilitychange',()=>{if(document.hidden)autoPause();});
   window.addEventListener('pagehide',saveBest);
   $('start').addEventListener('click',()=>{startOrResume();$('start').blur();});
@@ -186,7 +178,11 @@
   $('restart-dialog').addEventListener('cancel',e=>{e.preventDefault();cancelRestart();});
   $('confirm-restart').addEventListener('click',()=>{$('restart-dialog').close();begin();});
   function soundUI(){$('sound').innerHTML=`♪<span>音效${sound?'开':'关'}</span>`;$('sound').setAttribute('aria-label',sound?'关闭音效':'开启音效');$('sound').title=sound?'关闭音效':'开启音效';}
-  $('sound').addEventListener('click',()=>{sound=!sound;soundUI();try{localStorage.setItem('catris-sound-v1',String(sound));}catch{}if(sound)playTone('clear');$('sound').blur();});
+  $('sound').addEventListener('click',()=>{sound=!sound;audio.setEnabled(sound);soundUI();try{localStorage.setItem('catris-sound-v1',String(sound));}catch{}if(sound)playTone('clear');$('sound').blur();});
+  // Restore the preference without autoplay. A real gesture unlocks Web Audio.
+  audio.enabled=sound;
+  document.addEventListener('pointerdown',()=>audio.unlock(),{capture:true});
+  document.addEventListener('keydown',()=>audio.unlock(),{capture:true});
   touchButtons.forEach(button=>{
     button.addEventListener('pointerdown',e=>{
       if(game.status!=='playing'||e.button!==0)return;

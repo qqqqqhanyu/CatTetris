@@ -26,13 +26,15 @@ jobs:
         run: |
           node --check engine.js
           node --check skins.js
+          node --check audio.js
           node --check game.js
           node --test tests/*.test.cjs
       - name: Prepare website files
         run: |
-          mkdir -p _site/assets
-          cp index.html style.css mobile.css engine.js skins.js game.js manifest.webmanifest _site/
-          cp assets/cats.png assets/cats2-transparent.png assets/icon.svg assets/apple-touch-icon.png _site/assets/
+          mkdir -p _site/assets/audio
+          cp index.html style.css mobile.css engine.js skins.js audio.js game.js manifest.webmanifest _site/
+          cp assets/cats-transparent.png assets/cats2-transparent.png assets/icon.svg assets/apple-touch-icon.png _site/assets/
+          cp assets/audio/line-clear-meow-b.wav assets/audio/README.md _site/assets/audio/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'

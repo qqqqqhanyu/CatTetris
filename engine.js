@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
   const WIDTH = 10, HEIGHT = 20, HIDDEN = 2;
-  // Keep the cat's original upright pose at spawn; rotation and collision still use SRS.
+  // Keep the supplied cat pose at spawn; rotation and collision still use SRS.
   const SPAWN_ROTATIONS = {I:0,O:0,T:2,S:0,Z:0,J:3,L:1};
   const SHAPES = {
     I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],

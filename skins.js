@@ -4,16 +4,34 @@
   const engine=typeof module!=='undefined'&&module.exports?require('./engine.js'):root.CatrisEngine;
   const {MATRICES,SPAWN_ROTATIONS,cells}=engine;
   const SKINS={
-    jianguo:{name:'坚果',src:'assets/cats.png'},
-    yuanxiao:{name:'元宵',src:'assets/cats2-transparent.png'}
+    jianguo:{name:'坚果',src:'assets/cats-transparent.png?v=1.3.0'},
+    yuanxiao:{name:'元宵',src:'assets/cats2-transparent.png?v=1.3.0'}
   };
   // Generous source rectangles retain the ears and whiskers of both cats.
   const CROPS={
-    I:[18,96,596,251], O:[629,62,330,289], T:[1007,26,486,335],
+    I:[12,96,602,251], O:[625,62,338,289], T:[1000,0,520,400],
     S:[24,472,399,385], Z:[424,480,394,377], J:[820,425,335,455], L:[1155,438,360,443]
   };
   const UNIT=128, BLEED=.4, PAD=Math.ceil(UNIT*BLEED), TILE_SIZE=UNIT+PAD*2;
-  const RISE={I:.34,O:.18,T:.26,S:.22,Z:.22,J:.24,L:.24};
+  const RISE={I:.34,O:.18,T:.36,S:.22,Z:.22,J:.24,L:.24};
+
+  // Ignore empty atlas padding when fitting the cat to its four-cell silhouette.
+  function alphaBounds({data,width,height},threshold=24){
+    let left=width,top=height,right=-1,bottom=-1;
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(data[(y*width+x)*4+3]>threshold){
+      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+    }
+    return right<0?null:{x:left,y:top,width:right-left+1,height:bottom-top+1};
+  }
+  function tightCrop(img,[x,y,width,height]){
+    const canvas=makeCanvas(width,height),context=canvas.getContext('2d',{willReadFrequently:true});
+    context.drawImage(img,x,y,width,height,0,0,width,height);
+    const b=alphaBounds(context.getImageData(0,0,width,height));
+    if(!b)return [x,y,width,height];
+    // Keep a tiny feathering margin so thin whiskers retain their soft edge.
+    const left=Math.max(0,b.x-2),top=Math.max(0,b.y-2);
+    return [x+left,y+top,Math.min(width,b.x+b.width+2)-left,Math.min(height,b.y+b.height+2)-top];
+  }
 
   function bounds(type,rotation){
     const occupied=cells({type,rotation,x:0,y:0});
@@ -40,8 +58,9 @@
       const original=makeCanvas(n*UNIT+PAD*2),painter=original.getContext('2d',{willReadFrequently:true});
       // Use a single continuous drawing, including J/L heads. The collision
       // silhouette stays exact, while the fur is allowed into a small margin.
-      painter.drawImage(img,...CROPS[type],PAD+(b.minX-.035)*UNIT,PAD+(b.minY-RISE[type])*UNIT,
-        (b.maxX-b.minX+1+.07)*UNIT,(b.maxY-b.minY+1+RISE[type])*UNIT);
+      const wider=type==='T'?.22:.18,lower=type==='T'?.18:.10;
+      painter.drawImage(img,...tightCrop(img,CROPS[type]),PAD+(b.minX-wider/2)*UNIT,PAD+(b.minY-RISE[type])*UNIT,
+        (b.maxX-b.minX+1+wider)*UNIT,(b.maxY-b.minY+1+RISE[type]+lower)*UNIT);
       const source=painter.getImageData(0,0,original.width,original.height);
       const fragments=occupied.map(()=>new Uint8ClampedArray(TILE_SIZE*TILE_SIZE*4));
       for(let py=0;py<source.height;py++)for(let px=0;px<source.width;px++){
@@ -74,6 +93,6 @@
     const margin=PAD/UNIT*size;
     context.drawImage(texture,x-margin,y-margin,size+2*margin,size+2*margin);
   }
-  const api={SKINS,CROPS,UNIT,PAD,BLEED,SPAWN_ROTATIONS,bounds,ownerAt,rotatedCell,buildTextures,drawTileArt};
+  const api={SKINS,CROPS,UNIT,PAD,BLEED,SPAWN_ROTATIONS,bounds,ownerAt,rotatedCell,alphaBounds,buildTextures,drawTileArt};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CatrisSkins=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

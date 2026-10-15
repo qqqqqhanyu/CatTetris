@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="猫咪方块">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src 'self' file: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src 'self' file: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'">
   <title>猫咪方块 · CATRIS</title>
   <link rel="stylesheet" href="style.css?v=1.2.0">
   <link rel="stylesheet" href="mobile.css?v=1.2.0">
@@ -16,15 +16,16 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <script defer src="engine.js"></script>
-  <script defer src="skins.js?v=1.2.0"></script>
-  <script defer src="game.js?v=1.2.0"></script>
+  <script defer src="skins.js?v=1.3.0"></script>
+  <script defer src="audio.js?v=1.3.0"></script>
+  <script defer src="game.js?v=1.3.0"></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand"><svg class="cat-mark" aria-hidden="true" viewBox="0 0 40 40" fill="none" stroke="#628da4" stroke-width="1.7" stroke-linejoin="round"><path d="M7 16 6 5 16 10 Q20 8 24 10 L34 5 33 16 Q37 23 32 30 Q28 36 20 36 Q12 36 8 30 Q3 23 7 16Z"/><path d="M18 26 20 28 22 26M20 28v3"/><circle cx="13" cy="22" r="1.1" fill="#628da4"/><circle cx="27" cy="22" r="1.1" fill="#628da4"/></svg><div><b>猫咪方块</b><span>CATRIS / A LITTLE CAT PUZZLE</span></div></div>
       <div class="top-actions">
-        <span class="local-badge"><i></i>随时来一局 · v1.2</span>
+        <span class="local-badge"><i></i>随时来一局 · v1.3</span>
         <div class="skin-picker" role="group" aria-label="选择猫咪皮肤">
           <span class="skin-label">皮肤</span>
           <button type="button" data-skin="jianguo" aria-pressed="true"><i class="skin-dot jianguo"></i>坚果</button>

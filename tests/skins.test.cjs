@@ -1,7 +1,17 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {cells,MATRICES,SPAWN_ROTATIONS}=require('../engine.js');
-const {ownerAt,rotatedCell,drawTileArt,BLEED}=require('../skins.js');
+const {ownerAt,rotatedCell,drawTileArt,alphaBounds,BLEED}=require('../skins.js');
+
+test('transparent padding is removed while ear and whisker edges remain in the crop',()=>{
+  const width=12,height=10,data=new Uint8ClampedArray(width*height*4);
+  for(let y=3;y<=8;y++)for(let x=3;x<=9;x++)data[(y*width+x)*4+3]=255;
+  data[(1*width+5)*4+3]=100;data[(4*width+1)*4+3]=35;
+  assert.deepEqual(alphaBounds({data,width,height}),{x:1,y:1,width:9,height:8});
+});
+test('an empty sprite crop has no false content bounds',()=>{
+  assert.equal(alphaBounds({data:new Uint8ClampedArray(64),width:4,height:4}),null);
+});
 
 test('ears outside the grid belong to a real cell; distant decoration is discarded',()=>{
   const occupied=cells({type:'O',rotation:0,x:0,y:0});
